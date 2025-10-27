@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: tinyurl-service
+
+  # H2 Database Configuration
+  datasource:
+    url: jdbc:h2:mem:tinyurl;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driverClassName: org.h2.Driver
+    username: sa
+    password:
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+
+  # JPA Configuration
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  # H2 Console Configuration
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: false
+
+# Server Configuration
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 50
+
+# Logging Configuration
+logging:
+  level:
+    com.tinyurl: DEBUG
+    org.hibernate: WARN
+
+# Application Configuration
+app:
+  cache:
+    size: 50000 # Increased from 10000 for better performance
+    expire-hours: 1
