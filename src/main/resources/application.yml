@@ -2,33 +2,67 @@ spring:
   application:
     name: tinyurl-service
 
-  # H2 Database Configuration
+  # PostgreSQL Database Configuration
   datasource:
-    url: jdbc:h2:mem:tinyurl;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driverClassName: org.h2.Driver
-    username: sa
-    password:
+    # Primary database (write operations)
+    # Connection to PostgreSQL primary instance running on port 5433
+    url: jdbc:postgresql://localhost:5433/tinyurl
+    driverClassName: org.postgresql.Driver
+    username: postgres
+    password: postgres
+    # Read replicas configuration (comma-separated list of host:port)
+    # These will be used for read operations when @Transactional(readOnly = true) is used
+    read:
+      replicas: localhost:5434,localhost:5435,localhost:5436
     hikari:
       maximum-pool-size: 20
       minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      # Connection pool settings optimized for PostgreSQL
+      pool-name: TinyUrlHikariPool
 
   # JPA Configuration
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: update  # Creates/updates tables automatically
+      # For production, use: validate or none
     show-sql: false
     properties:
       hibernate:
         format_sql: true
+        # PostgreSQL-specific optimizations
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        # Use PostgreSQL sequences for ID generation
+        id:
+          new_generator_mappings: true
 
-  # H2 Console Configuration
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-      settings:
-        web-allow-others: false
+  # Redis Configuration
+  data:
+    redis:
+      # Host options:
+      # - localhost: Use if Redis is running locally on your machine
+      # - host.docker.internal: Use if Redis is in Docker and app runs locally
+      # - 127.0.0.1: Alternative to localhost
+      # - <docker-container-name>: Use if both Redis and app are in Docker
+      host: localhost
+      port: 6379
+      username: default # Set to empty string "" if not using ACL
+      password: # Set password here if Redis requires authentication
+      timeout: 10000ms # Increased timeout for better reliability
+      connect-timeout: 10000ms # Connection establishment timeout
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: 10000ms # Wait up to 10 seconds for connection
+        shutdown-timeout: 200ms
 
 # Server Configuration
 server:
@@ -46,9 +80,5 @@ logging:
   level:
     com.tinyurl: DEBUG
     org.hibernate: WARN
-
-# Application Configuration
-app:
-  cache:
-    size: 50000 # Increased from 10000 for better performance
-    expire-hours: 1
+    org.springframework.data.redis: DEBUG # Enable Redis connection debugging
+    io.lettuce.core: DEBUG # Enable Lettuce client debugging

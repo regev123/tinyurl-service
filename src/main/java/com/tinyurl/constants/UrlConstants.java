@@ -16,9 +16,13 @@ public final class UrlConstants {
     // Cache settings
     public static final int CACHE_DEFAULT_TTL_MINUTES = 1;
     public static final int CACHE_CLEANUP_INTERVAL_SECONDS = 30;
+    public static final String CACHE_KEY_PREFIX = "url:";
     
     // Validation
     public static final int MAX_ORIGINAL_URL_LENGTH = 5000;
     public static final int MAX_SHORT_CODE_LENGTH = 10;
+    
+    // URL Code Generation
+    public static final int MAX_CODE_GENERATION_ATTEMPTS = 100;
 }
 

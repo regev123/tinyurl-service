@@ -1,0 +1,118 @@
+services:
+  postgres-primary:
+    image: postgres:15
+    container_name: tinyurl-postgres-primary
+    environment:
+      POSTGRES_DB: tinyurl
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-primary-data:/var/lib/postgresql/data
+    command: >
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=5
+      -c max_replication_slots=5
+      -c hot_standby=on
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - postgres-network
+
+  postgres-replica1:
+    image: postgres:15
+    container_name: tinyurl-postgres-replica1
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGPASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-replica1-data:/var/lib/postgresql/data
+    command: >
+      bash -c "
+        until PGPASSWORD=postgres pg_basebackup -h postgres-primary -p 5432 -U postgres -D /var/lib/postgresql/data -Fp -Xs -P -R; do
+          echo 'Waiting for primary to be ready...'
+          sleep 2s
+        done
+
+        chown -R postgres:postgres /var/lib/postgresql/data
+        chmod 700 /var/lib/postgresql/data
+        exec gosu postgres postgres -c hot_standby=on
+      "
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    networks:
+      - postgres-network
+
+  postgres-replica2:
+    image: postgres:15
+    container_name: tinyurl-postgres-replica2
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGPASSWORD: postgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres-replica2-data:/var/lib/postgresql/data
+    command: >
+      bash -c "
+        until PGPASSWORD=postgres pg_basebackup -h postgres-primary -p 5432 -U postgres -D /var/lib/postgresql/data -Fp -Xs -P -R; do
+          echo 'Waiting for primary to be ready...'
+          sleep 2s
+        done
+        chown -R postgres:postgres /var/lib/postgresql/data
+        chmod 700 /var/lib/postgresql/data
+        exec gosu postgres postgres -c hot_standby=on
+      "
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    networks:
+      - postgres-network
+
+  postgres-replica3:
+    image: postgres:15
+    container_name: tinyurl-postgres-replica3
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGPASSWORD: postgres
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres-replica3-data:/var/lib/postgresql/data
+    command: >
+      bash -c "
+        until PGPASSWORD=postgres pg_basebackup -h postgres-primary -p 5432 -U postgres -D /var/lib/postgresql/data -Fp -Xs -P -R; do
+          echo 'Waiting for primary to be ready...'
+          sleep 2s
+        done
+        chown -R postgres:postgres /var/lib/postgresql/data
+        chmod 700 /var/lib/postgresql/data
+        exec gosu postgres postgres -c hot_standby=on
+      "
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    networks:
+      - postgres-network
+
+volumes:
+  postgres-primary-data:
+  postgres-replica1-data:
+  postgres-replica2-data:
+  postgres-replica3-data:
+
+networks:
+  postgres-network:
+    driver: bridge
+

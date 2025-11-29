@@ -47,20 +47,18 @@ class TinyUrlControllerTest {
         validRequest.setOriginalUrl("https://www.example.com");
         validRequest.setBaseUrl("http://localhost:8080");
 
-        successResult = new CreateUrlResult(
-            "https://www.example.com",
-            "http://localhost:8080/abc123",
-            "abc123",
-            true,
-            null
-        );
+        successResult = CreateUrlResult.builder()
+            .originalUrl("https://www.example.com")
+            .shortUrl("http://localhost:8080/abc123")
+            .shortCode("abc123")
+            .success(true)
+            .build();
 
-        lookupResult = new UrlLookupResult(
-            "abc123",
-            "https://www.example.com",
-            true,
-            null
-        );
+        lookupResult = UrlLookupResult.builder()
+            .shortUrl("abc123")
+            .originalUrl("https://www.example.com")
+            .found(true)
+            .build();
     }
 
     @Test
@@ -126,9 +124,11 @@ class TinyUrlControllerTest {
     @Test
     void testGetOriginalUrl_NotFound() throws Exception {
         // Given
-        UrlLookupResult notFoundResult = new UrlLookupResult(
-            "abc123", null, false, "Short URL not found"
-        );
+        UrlLookupResult notFoundResult = UrlLookupResult.builder()
+            .shortUrl("abc123")
+            .found(false)
+            .message("Short URL not found")
+            .build();
         when(urlShorteningService.lookupUrl("abc123")).thenReturn(notFoundResult);
 
         // When & Then
@@ -140,13 +140,11 @@ class TinyUrlControllerTest {
     @Test
     void testCreateShortUrl_ServiceError() throws Exception {
         // Given
-        CreateUrlResult errorResult = new CreateUrlResult(
-            "https://www.example.com",
-            null,
-            null,
-            false,
-            "Failed to create short URL"
-        );
+        CreateUrlResult errorResult = CreateUrlResult.builder()
+            .originalUrl("https://www.example.com")
+            .success(false)
+            .message("Failed to create short URL")
+            .build();
         when(urlShorteningService.createShortUrl(anyString(), anyString()))
             .thenReturn(errorResult);
 

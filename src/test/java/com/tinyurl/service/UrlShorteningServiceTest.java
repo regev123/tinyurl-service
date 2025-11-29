@@ -1,6 +1,5 @@
 package com.tinyurl.service;
 
-import com.tinyurl.cache.SimpleCache;
 import com.tinyurl.dto.CreateUrlResult;
 import com.tinyurl.dto.UrlLookupResult;
 import com.tinyurl.entity.UrlMapping;
@@ -28,10 +27,13 @@ class UrlShorteningServiceTest {
     private UrlMappingRepository urlMappingRepository;
 
     @Mock
-    private SimpleCache<String, String> urlCache;
+    private CacheService cacheService;
 
     @Mock
     private UrlCodeGenerator urlCodeGenerator;
+
+    @Mock
+    private UrlValidationService urlValidationService;
 
     @InjectMocks
     private UrlShorteningService urlShorteningService;
@@ -54,6 +56,8 @@ class UrlShorteningServiceTest {
     @Test
     void testCreateShortUrl_NewUrl() {
         // Given
+        doNothing().when(urlValidationService).validateOriginalUrl(anyString());
+        doNothing().when(urlValidationService).validateBaseUrl(anyString());
         when(urlMappingRepository.findByOriginalUrl(originalUrl))
             .thenReturn(Optional.empty());
         when(urlCodeGenerator.generateUniqueCode()).thenReturn(shortCode);
@@ -69,12 +73,15 @@ class UrlShorteningServiceTest {
         assertEquals(originalUrl, result.getOriginalUrl());
         assertEquals("http://localhost:8080/abc123", result.getShortUrl());
         verify(urlMappingRepository, times(1)).save(any(UrlMapping.class));
-        verify(urlCache, times(1)).put(eq(shortCode), eq(originalUrl));
+        // No caching during creation - caching happens only on lookup
+        verify(cacheService, never()).put(anyString(), anyString());
     }
 
     @Test
     void testCreateShortUrl_ExistingUrl() {
         // Given
+        doNothing().when(urlValidationService).validateOriginalUrl(anyString());
+        doNothing().when(urlValidationService).validateBaseUrl(anyString());
         when(urlMappingRepository.findByOriginalUrl(originalUrl))
             .thenReturn(Optional.of(existingMapping));
 
@@ -86,36 +93,39 @@ class UrlShorteningServiceTest {
         assertTrue(result.isSuccess());
         assertEquals(originalUrl, result.getOriginalUrl());
         verify(urlMappingRepository, never()).save(any(UrlMapping.class));
-        verify(urlCache, times(1)).put(eq(shortCode), eq(originalUrl));
+        // No caching during creation - caching happens only on lookup
+        verify(cacheService, never()).put(anyString(), anyString());
     }
 
     @Test
     void testGetOriginalUrl_FromCache() {
         // Given
-        when(urlCache.get(shortCode)).thenReturn(originalUrl);
+        when(cacheService.get(anyString())).thenReturn(originalUrl);
 
         // When
         String result = urlShorteningService.getOriginalUrl(shortCode);
 
         // Then
         assertEquals(originalUrl, result);
-        verify(urlCache, times(1)).get(shortCode);
+        verify(cacheService, times(1)).get(anyString());
         verify(urlMappingRepository, never()).findByShortUrl(anyString());
     }
 
     @Test
     void testGetOriginalUrl_FromDatabase() {
         // Given
-        when(urlCache.get(shortCode)).thenReturn(null);
+        when(cacheService.get(anyString())).thenReturn(null);
         when(urlMappingRepository.findByShortUrl(shortCode))
             .thenReturn(Optional.of(existingMapping));
+        doNothing().when(cacheService).put(anyString(), anyString());
 
         // When
         String result = urlShorteningService.getOriginalUrl(shortCode);
 
         // Then
         assertEquals(originalUrl, result);
-        verify(urlCache, times(1)).put(eq(shortCode), eq(originalUrl));
+        verify(cacheService, times(1)).get(anyString());
+        verify(cacheService, times(1)).put(anyString(), eq(originalUrl));
         verify(urlMappingRepository, times(1)).save(existingMapping);
     }
 
@@ -123,7 +133,7 @@ class UrlShorteningServiceTest {
     void testGetOriginalUrl_Expired() {
         // Given
         existingMapping.setExpiresAt(LocalDateTime.now().minusDays(1));
-        when(urlCache.get(shortCode)).thenReturn(null);
+        when(cacheService.get(anyString())).thenReturn(null);
         when(urlMappingRepository.findByShortUrl(shortCode))
             .thenReturn(Optional.of(existingMapping));
 
@@ -135,7 +145,7 @@ class UrlShorteningServiceTest {
     @Test
     void testGetOriginalUrl_NotFound() {
         // Given
-        when(urlCache.get(shortCode)).thenReturn(null);
+        when(cacheService.get(anyString())).thenReturn(null);
         when(urlMappingRepository.findByShortUrl(shortCode))
             .thenReturn(Optional.empty());
 
@@ -147,7 +157,7 @@ class UrlShorteningServiceTest {
     @Test
     void testLookupUrl_Success() {
         // Given
-        when(urlCache.get(shortCode)).thenReturn(originalUrl);
+        when(cacheService.get(anyString())).thenReturn(originalUrl);
 
         // When
         UrlLookupResult result = urlShorteningService.lookupUrl(shortCode);
@@ -161,7 +171,7 @@ class UrlShorteningServiceTest {
     @Test
     void testLookupUrl_NotFound() {
         // Given
-        when(urlCache.get(shortCode)).thenReturn(null);
+        when(cacheService.get(anyString())).thenReturn(null);
         when(urlMappingRepository.findByShortUrl(shortCode))
             .thenReturn(Optional.empty());
 
@@ -172,13 +182,14 @@ class UrlShorteningServiceTest {
         assertNotNull(result);
         assertFalse(result.isFound());
         assertEquals("Short URL not found", result.getMessage());
+        assertNotNull(result.getErrorCode());
     }
 
     @Test
     void testLookupUrl_Expired() {
         // Given
         existingMapping.setExpiresAt(LocalDateTime.now().minusDays(1));
-        when(urlCache.get(shortCode)).thenReturn(null);
+        when(cacheService.get(anyString())).thenReturn(null);
         when(urlMappingRepository.findByShortUrl(shortCode))
             .thenReturn(Optional.of(existingMapping));
 
@@ -189,6 +200,7 @@ class UrlShorteningServiceTest {
         assertNotNull(result);
         assertFalse(result.isFound());
         assertEquals("Short URL has expired", result.getMessage());
+        assertNotNull(result.getErrorCode());
     }
 }
 

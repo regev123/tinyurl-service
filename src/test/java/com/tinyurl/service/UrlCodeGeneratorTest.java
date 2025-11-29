@@ -1,5 +1,6 @@
 package com.tinyurl.service;
 
+import com.tinyurl.exception.UrlGenerationException;
 import com.tinyurl.repository.UrlMappingRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -56,7 +57,7 @@ class UrlCodeGeneratorTest {
             .thenReturn(true); // All codes taken (simulate full database)
 
         // When & Then
-        assertThrows(IllegalStateException.class, () -> 
+        assertThrows(UrlGenerationException.class, () -> 
             urlCodeGenerator.generateUniqueCode());
     }
 }

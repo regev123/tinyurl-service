@@ -7,6 +7,11 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+/**
+ * Entity representing a URL mapping (original URL to short URL)
+ * Follows Single Responsibility Principle - only represents URL mapping data
+ * Follows Encapsulation - data is properly encapsulated with JPA annotations
+ */
 @Entity
 @Table(name = "url_mappings", indexes = {
     @Index(columnList = "shortUrl"),
