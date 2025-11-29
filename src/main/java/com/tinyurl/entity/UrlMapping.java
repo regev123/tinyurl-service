@@ -40,4 +40,7 @@ public class UrlMapping {
     
     @Column(nullable = false)
     private Long accessCount = 0L;
+    
+    @Column
+    private LocalDateTime lastAccessedAt;
 }

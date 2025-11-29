@@ -76,11 +76,18 @@ public class ReplicaHealthChecker {
                 .build();
         
         try (Connection connection = dataSource.getConnection()) {
-            // Set connection timeout
-            connection.setNetworkTimeout(
-                Executors.newSingleThreadExecutor(),
-                (int) TimeUnit.SECONDS.toMillis(CONNECTION_TIMEOUT_SECONDS)
-            );
+            // Set connection timeout using a shared executor
+            // Note: Connection.setNetworkTimeout requires an Executor, but we don't need to manage it
+            // The connection will handle the executor lifecycle for network timeout operations
+            java.util.concurrent.ExecutorService timeoutExecutor = Executors.newSingleThreadExecutor();
+            try {
+                connection.setNetworkTimeout(
+                    timeoutExecutor,
+                    (int) TimeUnit.SECONDS.toMillis(CONNECTION_TIMEOUT_SECONDS)
+                );
+            } finally {
+                timeoutExecutor.shutdown();
+            }
             
             // Check if replica is in recovery mode (should be true for replicas)
             boolean inRecovery = checkInRecovery(connection);

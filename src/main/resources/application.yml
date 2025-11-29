@@ -75,6 +75,18 @@ server:
       max: 200
       min-spare: 50
 
+# URL Cleanup Configuration
+url:
+  cleanup:
+    enabled: true                    # Enable/disable cleanup job
+    retention-months: 6               # Delete URLs not accessed in last 6 months
+    cron: "0 0 2 * * ?"              # Run daily at 2:00 AM (cron expression)
+    batch-size: 1000                  # Number of URLs to delete per batch
+    # Note: URLs are deleted if:
+    # 1. Not accessed in last 6 months (retention-months)
+    # 2. OR expired (expiresAt < current time)
+    # Expiration is set to 1 year from creation by default (see UrlConstants.DEFAULT_EXPIRATION_YEARS)
+
 # Logging Configuration
 logging:
   level:

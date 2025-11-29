@@ -614,6 +614,7 @@ public String getOriginalUrl(String shortCode) {
 - **Cache**: Redis distributed cache for sub-millisecond lookups
 - **Horizontal scaling**: Stateless design, easily scalable
 - **Connection Pooling**: HikariCP with configurable pool sizes
+- **Future Sharding**: Architecture supports database sharding for 1B+ URLs (range-based by short code prefix, each shard with 1 primary + 3 replicas)
 
 ### Performance Metrics
 

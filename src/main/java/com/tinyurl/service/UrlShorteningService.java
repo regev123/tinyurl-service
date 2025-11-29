@@ -183,7 +183,7 @@ public class UrlShorteningService implements UrlCreationService, UrlLookupServic
     }
     
     /**
-     * Increments the access count for a URL mapping
+     * Increments the access count for a URL mapping and updates last accessed timestamp
      * Uses a new write transaction (REQUIRES_NEW) to ensure it routes to primary database
      * even when called from within a read-only transaction
      * 
@@ -192,6 +192,7 @@ public class UrlShorteningService implements UrlCreationService, UrlLookupServic
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void incrementAccessCount(UrlMapping mapping) {
         mapping.setAccessCount(mapping.getAccessCount() + 1);
+        mapping.setLastAccessedAt(LocalDateTime.now());
         urlMappingRepository.save(mapping);
     }
     

@@ -43,6 +43,7 @@ public final class UrlMappingFactory {
         mapping.setCreatedAt(now);
         mapping.setExpiresAt(now.plusYears(DEFAULT_EXPIRATION_YEARS));
         mapping.setAccessCount(DEFAULT_ACCESS_COUNT);
+        mapping.setLastAccessedAt(null); // Will be set on first access
         
         return mapping;
     }

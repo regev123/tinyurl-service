@@ -40,6 +40,48 @@ Read Replicas:
 3. ✅ Implement connection pooling (HikariCP)
 4. ⏳ Add database sharding (if needed for further scaling)
 
+#### Database Sharding (Future Scalability)
+
+For extreme scale scenarios (1B+ URLs, 10K+ writes/sec), the system is designed to support **horizontal sharding**:
+
+**Sharding Strategy:**
+- **Range-based sharding** by short code prefix (A-F, G-M, N-S, T-Z)
+- Each shard contains 1 primary (write) + 3 read replicas
+- Shard router determines target shard based on short code hash
+- Independent failure domains per shard
+
+**Architecture:**
+```
+Shard 1 (A-F): Primary + 3 Replicas
+Shard 2 (G-M): Primary + 3 Replicas  
+Shard 3 (N-S): Primary + 3 Replicas
+Shard 4 (T-Z): Primary + 3 Replicas
+```
+
+**When to Shard:**
+- Database size exceeds 500GB-1TB
+- Write throughput exceeds 10,000 writes/sec
+- Single database becomes bottleneck
+- Need geographic distribution
+
+**Implementation Approach:**
+- Hash-based routing: `shardNumber = hash(shortCode) % numberOfShards`
+- Each shard operates independently with its own connection pool
+- Cross-shard queries avoided through proper routing
+- Resharding strategy planned for data migration
+
+**Sharding Benefits:**
+- **Horizontal Scaling**: Add more shards as data grows
+- **Better Performance**: Smaller databases = faster queries
+- **Higher Throughput**: Multiple write servers instead of one
+- **Fault Isolation**: If one shard fails, others continue working
+
+**Sharding Challenges:**
+- **Complexity**: Shard routing logic needed, cross-shard queries complex
+- **Data Distribution**: Uneven distribution can cause hot spots
+- **Resharding Difficulty**: Moving data between shards requires careful planning
+- **Transaction Complexity**: Distributed transactions are complex
+
 ---
 
 ### 2. **Cache Strategy** 🔴 CRITICAL
