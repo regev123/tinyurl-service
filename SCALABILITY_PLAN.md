@@ -226,7 +226,7 @@ public class RedisIdGenerator {
 
 ---
 
-### 4. **Architecture Changes** ✅ IMPLEMENTED
+### 4. **Architecture Changes** 🟡 IN PROGRESS
 
 #### Microservices Architecture
 
@@ -264,6 +264,18 @@ public class RedisIdGenerator {
     ┌──────────────────────────────────┐
     │      Redis Cache (Lookup Only)   │
     └──────────────────────────────────┘
+```
+
+**In Progress: API Gateway Implementation**
+
+```
+⏳ API Gateway needed to:
+  - Route requests to appropriate microservices
+  - Provide single entry point for clients
+  - Handle load balancing across service instances
+  - Implement rate limiting and authentication
+  - Centralized logging and monitoring
+  - Request/response transformation
 ```
 
 **Production Deployment (Future Scaling):**
@@ -307,6 +319,7 @@ public class RedisIdGenerator {
 **Service Breakdown:**
 - ✅ **Create Service**: Implemented (Port 8081) - Handles URL creation
 - ✅ **Lookup Service**: Implemented (Port 8082) - Handles URL lookups with caching
+- 🟡 **API Gateway**: In progress - Single entry point for all services
 - ⏳ **Stats Service**: Future enhancement (handles analytics)
 
 **Implementation Status:**
@@ -315,6 +328,7 @@ public class RedisIdGenerator {
 - ✅ Service-specific repositories (CreateUrlRepository, LookupUrlRepository)
 - ✅ Service-specific exceptions and constants
 - ✅ Independent deployment and scaling capability
+- 🟡 API Gateway implementation (in progress)
 
 ---
 
