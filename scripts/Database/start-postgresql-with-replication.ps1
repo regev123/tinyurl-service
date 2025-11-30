@@ -6,15 +6,20 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "PostgreSQL Replication Auto-Setup" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
-# Step 1: Clean up old containers (if any)
-Write-Host "[1/7] Cleaning up old containers (if any)..." -ForegroundColor Yellow
+# Step 1: Clean up old containers and volumes (if any)
+Write-Host "[1/7] Cleaning up old containers and volumes (if any)..." -ForegroundColor Yellow
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-docker-compose -f "$scriptDir\docker-compose-postgresql.yml" down 2>$null | Out-Null
+
+# Stop and remove containers with volumes (this will delete all data)
+docker-compose -f "$scriptDir\docker-compose-postgresql.yml" down -v 2>$null | Out-Null
 
 # Remove any orphaned containers with the same names
 docker rm -f tinyurl-postgres-primary tinyurl-postgres-replica1 tinyurl-postgres-replica2 tinyurl-postgres-replica3 2>$null | Out-Null
 
-Write-Host "  Cleanup complete!`n" -ForegroundColor Green
+# Remove volumes if they still exist (in case docker-compose down -v didn't work)
+docker volume rm postgres-primary-data postgres-replica1-data postgres-replica2-data postgres-replica3-data 2>$null | Out-Null
+
+Write-Host "  Cleanup complete! All previous data has been removed.`n" -ForegroundColor Green
 
 # Step 2: Start Docker Compose
 Write-Host "[2/7] Starting Docker Compose containers..." -ForegroundColor Yellow
@@ -71,7 +76,7 @@ if ($existingEntry) {
 
 # Step 5: Reload PostgreSQL configuration
 Write-Host "[5/7] Reloading PostgreSQL configuration..." -ForegroundColor Yellow
-$reloadResult = docker exec tinyurl-postgres-primary psql -U postgres -t -c "SELECT pg_reload_conf();" 2>$null
+docker exec tinyurl-postgres-primary psql -U postgres -t -c "SELECT pg_reload_conf();" 2>$null | Out-Null
 if ($LASTEXITCODE -eq 0) {
     Write-Host "  Configuration reloaded successfully!`n" -ForegroundColor Green
 } else {

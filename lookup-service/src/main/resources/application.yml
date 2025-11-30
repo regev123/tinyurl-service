@@ -1,0 +1,69 @@
+spring:
+  application:
+    name: lookup-service
+
+  # PostgreSQL Database Configuration
+  datasource:
+    # Primary database (write operations)
+    url: jdbc:postgresql://localhost:5433/tinyurl
+    driverClassName: org.postgresql.Driver
+    username: postgres
+    password: postgres
+    # Read replicas configuration (comma-separated list of host:port)
+    read:
+      replicas: localhost:5434,localhost:5435,localhost:5436
+      health-check-interval-seconds: 30
+      max-replication-lag-mb: 10
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: LookupServiceHikariPool
+
+  # JPA Configuration
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        id:
+          new_generator_mappings: true
+
+  # Redis Configuration
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      username: default
+      password:
+      timeout: 10000ms
+      connect-timeout: 10000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: 10000ms
+        shutdown-timeout: 200ms
+
+# Server Configuration
+server:
+  port: 8082  # Different port for lookup-service
+
+# Logging Configuration
+logging:
+  level:
+    com.tinyurl: DEBUG
+    org.hibernate: WARN
+    org.springframework.data.redis: DEBUG
+    io.lettuce.core: DEBUG
+

@@ -42,7 +42,7 @@ A production-ready, high-performance URL shortening service built with **Spring 
 - ✅ **Read/Write Splitting** - Automatic routing of reads to replicas and writes to primary
 - ✅ **Replica Health Checks** - Automatic monitoring and failover for unhealthy replicas
 - ✅ **Round-Robin Load Balancing** - Even distribution of read requests across replicas
-- ✅ **Redis Distributed Cache** - High-performance caching with 1-minute TTL
+- ✅ **Redis Distributed Cache** - High-performance caching with adaptive TTL (10-30 minutes)
 - ✅ **Cache Abstraction** - CacheService interface for easy implementation swapping
 - ✅ **Database Indexing** - Optimized lookups on short URLs
 - ✅ **Connection Pooling** - HikariCP with optimized pool settings
@@ -78,46 +78,88 @@ A production-ready, high-performance URL shortening service built with **Spring 
 
 ## 🏗 Architecture
 
+### Microservices Architecture
+
+The application is built as a **Maven multi-module project** with three modules:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Maven Parent POM                         │
+│              (tinyurl-services:1.0.0)                        │
+└──────────────┬──────────────────┬────────────────────────────┘
+               │                  │
+       ┌───────┴───────┐  ┌───────┴────────┐
+       │               │  │                │
+       ▼               ▼  ▼                ▼
+┌──────────┐   ┌──────────────┐   ┌──────────────┐
+│  Common  │   │   Create    │   │   Lookup     │
+│  Module  │   │   Service    │   │   Service    │
+│          │   │              │   │              │
+│ • Entity │   │ • Controller │   │ • Controller │
+│ • Error  │   │ • Service    │   │ • Service    │
+│   Codes  │   │ • Repository │   │ • Repository │
+│          │   │ • Utils      │   │ • Cache      │
+│          │   │ • Factory    │   │ • Cleanup    │
+│          │   │ • Constants  │   │ • Constants  │
+│          │   │ • Exceptions │   │ • Exceptions  │
+└────┬─────┘   └──────┬───────┘   └──────┬───────┘
+     │                 │                  │
+     └────────┬────────┴────────┬─────────┘
+              │                 │
+              ▼                 ▼
+    ┌──────────────────────────────────┐
+    │      Shared Database             │
+    │  PostgreSQL (Primary + Replicas) │
+    └──────────────────────────────────┘
+              │
+              ▼
+    ┌──────────────────────────────────┐
+    │      Redis Cache (Lookup Only)   │
+    └──────────────────────────────────┘
+```
+
 ### System Design
 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                        Client                            │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     ▼
+└──────┬──────────────────────────────┬────────────────────┘
+       │                              │
+       ▼                              ▼
+┌──────────────────────┐    ┌──────────────────────┐
+│  Create Service      │    │  Lookup Service       │
+│  Port: 8081         │    │  Port: 8082           │
+│                      │    │                      │
+│  • CreateUrlController│    │  • LookupUrlController│
+│  • CreateUrlService  │    │  • LookupUrlService  │
+│  • UrlCodeGenerator  │    │  • RedisCacheService │
+│  • UrlValidation     │    │  • UrlCleanupService  │
+└──────┬───────────────┘    └──────┬───────────────┘
+       │                            │
+       │                            │
+       ▼                            ▼
 ┌──────────────────────────────────────────────────────────┐
-│              REST Controller Layer                      │
-│  • TinyUrlController                                     │
-│  • RequestContextExtractor                               │
+│              Common Module (Shared)                      │
+│  • UrlMapping (Entity)                                   │
+│  • ErrorCode (Enum)                                      │
 └──────┬───────────────────────────────────────────────────┘
        │
        ▼
 ┌──────────────────────────────────────────────────────────┐
-│              Service Layer (Interfaces)                  │
-│  • UrlCreationService (Interface)                         │
-│  • UrlLookupService (Interface)                          │
-│  • UrlShorteningService (Implementation)                 │
-│  • UrlCodeGenerator (Code Generation)                    │
-│  • UrlValidationService (Input Validation)               │
-└──────┬──────────────────────┬────────────────────────────┘
-       │                      │
-       ▼                      ▼
-┌──────────────────┐   ┌───────────────────────────────┐
-│  Cache Layer     │   │  Repository Layer             │
-│  CacheService    │   │  UrlMappingRepository (JPA)  │
-│  (Interface)     │   └─────────┬─────────────────────┘
-│  RedisCacheService│             │
-│  (Redis Impl)    │             ▼
-│  (TTL: 1min)     │   ┌──────────────────────────────┐
-└──────────────────┘   │  Database Layer               │
-                       │  • Primary (Write)            │
-                       │  • Replica 1 (Read)           │
-                       │  • Replica 2 (Read)           │
-                       │  • Replica 3 (Read)           │
-                       │  • Health Checks              │
-                       │  • Round-Robin Load Balancing │
-                       └──────────────────────────────┘
+│              Repository Layer                            │
+│  • CreateUrlRepository (Create Service)                  │
+│  • LookupUrlRepository (Lookup Service)                  │
+└──────┬───────────────────────────────────────────────────┘
+       │
+       ▼
+┌──────────────────────────────────────────────────────────┐
+│              Database Layer                              │
+│  • Primary (Write) - Port 5433                          │
+│  • Replica 1 (Read) - Port 5434                         │
+│  • Replica 2 (Read) - Port 5435                         │
+│  • Replica 3 (Read) - Port 5436                         │
+│  • Health Checks & Round-Robin Load Balancing            │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ### Design Patterns
@@ -160,43 +202,62 @@ A production-ready, high-performance URL shortening service built with **Spring 
 
 ### Core Components
 
-```java
-Service Layer
-├── UrlCreationService (Interface)
-├── UrlLookupService (Interface)
-├── UrlShorteningService (Implementation)
-├── UrlCodeGenerator (Code Generation)
-├── UrlValidationService (Input Validation)
-└── RequestContextExtractor (HTTP Context)
+**Common Module** (Shared across services):
+```
+common/
+├── entity/
+│   └── UrlMapping.java                    # Shared JPA entity
+└── constants/
+    └── ErrorCode.java                     # Shared error codes enum
+```
 
-Entity Layer
-├── UrlMapping (Domain Entity)
-└── UrlMappingFactory (Factory Pattern)
+**Create Service** (Port 8081):
+```
+create-service/
+├── controller/
+│   └── CreateUrlController.java          # REST endpoints for URL creation
+├── service/
+│   ├── CreateUrlService.java             # URL creation logic
+│   ├── UrlCodeGenerator.java             # Unique code generation
+│   ├── UrlValidationService.java         # Input validation
+│   ├── RequestContextExtractor.java      # HTTP context extraction
+│   └── UrlCreationService.java          # Service interface
+├── repository/
+│   └── CreateUrlRepository.java          # JPA repository (create operations)
+├── entity/
+│   └── UrlMappingFactory.java            # Entity factory
+├── dto/
+│   ├── CreateUrlRequest.java             # Request DTO
+│   └── CreateUrlResult.java             # Response DTO
+├── util/
+│   ├── Base62Encoder.java                # Base62 encoding
+│   └── UrlBuilder.java                   # URL building utility
+├── constants/
+│   └── CreateUrlConstants.java           # Service-specific constants
+└── exception/
+    └── UrlGenerationException.java        # Service-specific exception
+```
 
-Repository Layer
-└── UrlMappingRepository (JPA Repository)
-
-Cache Layer
-├── CacheService (Interface)
-└── RedisCacheService (Redis Implementation)
-    ├── TTL: 1 minute
-    └── Cache-aside pattern
-
-Database Layer
-├── DatabaseConfig (Read/Write Splitting)
-├── ReplicaHealthChecker (Health Monitoring)
-└── ReplicaHealth (Health Status)
-
-Utility Layer
-├── Base62Encoder (Encoding)
-└── UrlBuilder (URL Building)
-
-Constants & Exceptions
-├── ErrorCode (Enum - Type-safe errors)
-├── UrlConstants (Configuration constants)
-├── UrlNotFoundException
-├── UrlExpiredException
-└── UrlGenerationException
+**Lookup Service** (Port 8082):
+```
+lookup-service/
+├── controller/
+│   └── LookupUrlController.java          # REST endpoints for URL lookup
+├── service/
+│   ├── LookupUrlService.java             # URL lookup logic
+│   ├── RedisCacheService.java           # Redis cache implementation
+│   ├── UrlCleanupService.java           # Scheduled cleanup job
+│   ├── CacheService.java                 # Cache interface
+│   └── UrlLookupService.java             # Service interface
+├── repository/
+│   └── LookupUrlRepository.java          # JPA repository (lookup operations)
+├── dto/
+│   └── UrlLookupResult.java             # Lookup result DTO
+├── constants/
+│   └── LookupUrlConstants.java           # Service-specific constants
+└── exception/
+    ├── UrlNotFoundException.java          # Service-specific exception
+    └── UrlExpiredException.java           # Service-specific exception
 ```
 
 ## 🎯 SOLID Principles
@@ -287,23 +348,40 @@ This project demonstrates **100% adherence to SOLID principles** (Grade 10/10) w
 
 4. **Configure application**
 
-   Update `src/main/resources/application.yml` with your database and Redis settings.
+   Update service configuration files:
+   - `create-service/src/main/resources/application.yml` - Create service config
+   - `lookup-service/src/main/resources/application.yml` - Lookup service config
+   
+   Both services share the same PostgreSQL database but run on different ports.
 
 5. **Build the project**
 
    ```bash
+   # Build all modules (common builds first, then services)
+   mvnw clean install
+   
+   # Or using Maven directly
    mvn clean install
    ```
 
-6. **Run the application**
+6. **Run the services**
 
    ```bash
-   mvn spring-boot:run
+   # Terminal 1: Start Create Service (Port 8081)
+   cd create-service
+   mvnw spring-boot:run
+   # Or: java -jar target/create-service-1.0.0.jar
+   
+   # Terminal 2: Start Lookup Service (Port 8082)
+   cd lookup-service
+   mvnw spring-boot:run
+   # Or: java -jar target/lookup-service-1.0.0.jar
    ```
 
-7. **Verify it's running**
+7. **Verify services are running**
    ```
-   Server started on http://localhost:8080
+   Create Service: http://localhost:8081/api/v1/create/health
+   Lookup Service: http://localhost:8082/health
    ```
 
 ## 🗄 Database Setup
@@ -357,9 +435,11 @@ Use pgAdmin or any PostgreSQL client to connect.
 
 ## 📚 API Documentation
 
-### 1. Create Short URL
+### Create Service (Port 8081)
 
-**Endpoint:** `POST /api/v1/url/shorten`
+#### 1. Create Short URL
+
+**Endpoint:** `POST http://localhost:8081/api/v1/create/shorten`
 
 **Request:**
 
@@ -394,11 +474,13 @@ Use pgAdmin or any PostgreSQL client to connect.
 }
 ```
 
-### 2. Redirect to Original URL
+### Lookup Service (Port 8082)
 
-**Endpoint:** `GET /{shortUrl}`
+#### 2. Redirect to Original URL
 
-**Example:** `GET /a3F9k1`
+**Endpoint:** `GET http://localhost:8082/{shortUrl}`
+
+**Example:** `GET http://localhost:8082/a3F9k1`
 
 **Response:** `302 Found` → Redirects to original URL
 
@@ -416,24 +498,31 @@ Use pgAdmin or any PostgreSQL client to connect.
 ### Example cURL Commands
 
 ```bash
-# Create a short URL
-curl -X POST http://localhost:8080/api/v1/url/shorten \
+# Create a short URL (Create Service - Port 8081)
+curl -X POST http://localhost:8081/api/v1/create/shorten \
   -H "Content-Type: application/json" \
   -d '{
     "originalUrl": "https://www.google.com",
-    "baseUrl": "http://localhost:8080"
+    "baseUrl": "https://tiny.url"
   }'
 
-# Redirect (follow redirects with -L)
-curl -L http://localhost:8080/a3F9k1
+# Redirect to original URL (Lookup Service - Port 8082)
+curl -L http://localhost:8082/a3F9k1
 
-# Test with invalid URL
-curl -X POST http://localhost:8080/api/v1/url/shorten \
+# Or without following redirects (see response headers)
+curl -I http://localhost:8082/a3F9k1
+
+# Test with invalid URL (Create Service)
+curl -X POST http://localhost:8081/api/v1/create/shorten \
   -H "Content-Type: application/json" \
   -d '{
     "originalUrl": "invalid-url",
-    "baseUrl": "http://localhost:8080"
+    "baseUrl": "https://tiny.url"
   }'
+
+# Health checks
+curl http://localhost:8081/api/v1/create/health
+curl http://localhost:8082/health
 ```
 
 ## 💡 Implementation Highlights
@@ -627,10 +716,11 @@ public String getOriginalUrl(String shortCode) {
 
 ### Application Properties
 
+**Create Service** (`create-service/src/main/resources/application.yml`):
 ```yaml
 spring:
   application:
-    name: tinyurl-service
+    name: create-service
 
   # PostgreSQL Database Configuration
   datasource:
@@ -655,7 +745,44 @@ spring:
       ddl-auto: update
     show-sql: false
 
-  # Redis Configuration
+server:
+  port: 8081
+
+logging:
+  level:
+    com.tinyurl: DEBUG
+```
+
+**Lookup Service** (`lookup-service/src/main/resources/application.yml`):
+```yaml
+spring:
+  application:
+    name: lookup-service
+
+  # PostgreSQL Database Configuration (same as create-service)
+  datasource:
+    url: jdbc:postgresql://localhost:5433/tinyurl
+    driverClassName: org.postgresql.Driver
+    username: postgres
+    password: postgres
+    # Read replicas configuration
+    read:
+      replicas: localhost:5434,localhost:5435,localhost:5436
+      health-check-interval-seconds: 30
+      max-replication-lag-mb: 10
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  # JPA Configuration
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+  # Redis Configuration (Lookup Service Only)
   data:
     redis:
       host: localhost
@@ -667,19 +794,20 @@ spring:
           max-idle: 8
 
 server:
-  port: 8080
+  port: 8082
 
 logging:
   level:
     com.tinyurl: DEBUG
 ```
 
-### Cache Settings
+### Cache Settings (Lookup Service Only)
 
-- **TTL**: 1 minute (configurable)
-- **Pattern**: Cache-aside
+- **TTL**: Adaptive (10 min default, 15 min warm, 30 min hot)
+- **Pattern**: Cache-aside with sliding expiration
 - **Implementation**: Redis
 - **Connection Pool**: Lettuce with connection pooling
+- **Access-based TTL**: Frequently accessed URLs cached longer
 
 ### Database Settings
 
@@ -734,48 +862,83 @@ mvn test jacoco:report
 ## 📁 Project Structure
 
 ```
-src/main/java/com/tinyurl/
-├── config/
-│   ├── CacheConfig.java                    # Redis cache configuration
-│   ├── DatabaseConfig.java                 # Read/write splitting configuration
-│   └── ReplicaHealthChecker.java          # Replica health monitoring
-├── controller/
-│   └── TinyUrlController.java              # REST API endpoints
-├── service/
-│   ├── CacheService.java                   # Cache interface
-│   ├── RedisCacheService.java              # Redis cache implementation
-│   ├── UrlCreationService.java             # Interface for URL creation
-│   ├── UrlLookupService.java               # Interface for URL lookup
-│   ├── UrlShorteningService.java           # Main service implementation
-│   ├── UrlCodeGenerator.java               # URL code generation
-│   ├── UrlValidationService.java           # Input validation
-│   └── RequestContextExtractor.java        # HTTP context extraction
-├── repository/
-│   └── UrlMappingRepository.java           # JPA repository
-├── entity/
-│   ├── UrlMapping.java                     # Domain entity
-│   └── UrlMappingFactory.java              # Entity factory
-├── dto/
-│   ├── CreateUrlRequest.java               # Request DTO
-│   ├── CreateUrlResult.java                # Response DTO
-│   └── UrlLookupResult.java                # Lookup result DTO
-├── exception/
-│   ├── UrlNotFoundException.java           # Not found exception
-│   ├── UrlExpiredException.java             # Expired exception
-│   └── UrlGenerationException.java         # Generation exception
-├── util/
-│   ├── Base62Encoder.java                  # Base62 encoding
-│   └── UrlBuilder.java                     # URL building utility
-└── constants/
-    ├── ErrorCode.java                      # Type-safe error codes
-    └── UrlConstants.java                   # Configuration constants
-
-scripts/
-└── Database/
-    ├── docker-compose-postgresql.yml       # PostgreSQL setup with replicas
-    ├── start-postgresql-with-replication.ps1  # Automated setup script
-    └── initialize-data.ps1                 # Data initialization script
+tinyurl-service/
+├── pom.xml                                 # Parent POM (Maven multi-module)
+├── mvnw.cmd                               # Maven wrapper
+│
+├── common/                                # Common Module (Shared Code)
+│   ├── pom.xml
+│   └── src/main/java/com/tinyurl/
+│       ├── entity/
+│       │   └── UrlMapping.java            # Shared JPA entity
+│       └── constants/
+│           └── ErrorCode.java             # Shared error codes enum
+│
+├── create-service/                        # Create Service (Port 8081)
+│   ├── pom.xml
+│   └── src/main/java/com/tinyurl/create/
+│       ├── CreateServiceApplication.java  # Main application class
+│       ├── controller/
+│       │   └── CreateUrlController.java   # REST endpoints
+│       ├── service/
+│       │   ├── CreateUrlService.java      # URL creation logic
+│       │   ├── UrlCodeGenerator.java      # Code generation
+│       │   ├── UrlValidationService.java  # Input validation
+│       │   ├── RequestContextExtractor.java
+│       │   └── UrlCreationService.java   # Service interface
+│       ├── repository/
+│       │   └── CreateUrlRepository.java   # JPA repository
+│       ├── entity/
+│       │   └── UrlMappingFactory.java     # Entity factory
+│       ├── dto/
+│       │   ├── CreateUrlRequest.java      # Request DTO
+│       │   └── CreateUrlResult.java       # Response DTO
+│       ├── util/
+│       │   ├── Base62Encoder.java         # Base62 encoding
+│       │   └── UrlBuilder.java           # URL building
+│       ├── constants/
+│       │   └── CreateUrlConstants.java    # Service constants
+│       └── exception/
+│           └── UrlGenerationException.java
+│
+├── lookup-service/                        # Lookup Service (Port 8082)
+│   ├── pom.xml
+│   └── src/main/java/com/tinyurl/lookup/
+│       ├── LookupServiceApplication.java  # Main application class
+│       ├── controller/
+│       │   └── LookupUrlController.java   # REST endpoints
+│       ├── service/
+│       │   ├── LookupUrlService.java      # URL lookup logic
+│       │   ├── RedisCacheService.java     # Redis cache implementation
+│       │   ├── UrlCleanupService.java     # Scheduled cleanup
+│       │   ├── CacheService.java          # Cache interface
+│       │   └── UrlLookupService.java      # Service interface
+│       ├── repository/
+│       │   └── LookupUrlRepository.java   # JPA repository
+│       ├── dto/
+│       │   └── UrlLookupResult.java       # Lookup result DTO
+│       ├── constants/
+│       │   └── LookupUrlConstants.java    # Service constants
+│       └── exception/
+│           ├── UrlNotFoundException.java
+│           └── UrlExpiredException.java
+│
+└── scripts/
+    ├── Database/
+    │   ├── docker-compose-postgresql.yml
+    │   └── start-postgresql-with-replication.ps1
+    ├── load-test-create-service.ps1      # Load test for create service
+    └── load-test-lookup-service.ps1      # Load test for lookup service
 ```
+
+### Build Order
+
+Maven builds modules in this order:
+1. **common** - Shared code (builds first)
+2. **create-service** - Depends on common
+3. **lookup-service** - Depends on common
+
+Both services include the `common` module JAR as a dependency.
 
 ## 🎯 Key Design Decisions
 
