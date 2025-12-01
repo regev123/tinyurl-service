@@ -106,11 +106,31 @@ services:
     networks:
       - postgres-network
 
+  postgres-stats:
+    image: postgres:15
+    container_name: tinyurl-postgres-stats
+    environment:
+      POSTGRES_DB: tinyurl_stats
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5437:5432"
+    volumes:
+      - postgres-stats-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # No network dependency - stats DB is completely independent
+    # Data comes from Kafka events, not from URL database
+
 volumes:
   postgres-primary-data:
   postgres-replica1-data:
   postgres-replica2-data:
   postgres-replica3-data:
+  postgres-stats-data:
 
 networks:
   postgres-network:

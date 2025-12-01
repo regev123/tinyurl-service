@@ -3,6 +3,8 @@ package com.tinyurl.lookup.controller;
 import com.tinyurl.constants.ErrorCode;
 import com.tinyurl.lookup.dto.UrlLookupResult;
 import com.tinyurl.lookup.service.LookupUrlService;
+import com.tinyurl.lookup.service.StatsClientService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 public class LookupUrlController {
     
     private final LookupUrlService lookupUrlService;
+    private final StatsClientService statsClientService;
     
     /**
      * Retrieves the original URL for a short URL and redirects
@@ -37,11 +40,18 @@ public class LookupUrlController {
      */
     @GetMapping("/{shortUrl}")
     public ResponseEntity<?> getOriginalUrl(
-            @PathVariable("shortUrl") String shortUrl) {
+            @PathVariable("shortUrl") String shortUrl,
+            HttpServletRequest request) {
         
         UrlLookupResult result = lookupUrlService.lookupUrl(shortUrl);
         
         if (result.isFound()) {
+            // Record click event to Kafka (non-blocking, decoupled)
+            String ipAddress = getClientIpAddress(request);
+            String userAgent = request.getHeader("User-Agent");
+            String referrer = request.getHeader("Referer");
+            statsClientService.recordClickEvent(shortUrl, ipAddress, userAgent, referrer);
+            
             return ResponseEntity.status(HttpStatus.FOUND)
                     .location(java.net.URI.create(result.getOriginalUrl()))
                     .build();
@@ -49,6 +59,18 @@ public class LookupUrlController {
             HttpStatus status = mapErrorCodeToHttpStatus(result.getErrorCode());
             return ResponseEntity.status(status).body(result);
         }
+    }
+    
+    private String getClientIpAddress(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isEmpty()) {
+            return xRealIp;
+        }
+        return request.getRemoteAddr();
     }
     
     /**

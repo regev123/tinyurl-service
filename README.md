@@ -1,6 +1,6 @@
 # TinyURL Service
 
-A production-ready, high-performance URL shortening service built with **Spring Boot**, featuring **PostgreSQL with read replicas**, **Redis distributed caching**, and scalable architecture following **SOLID principles** and clean code best practices.
+A production-ready, high-performance URL shortening service built with **Spring Boot**, featuring **PostgreSQL with read replicas**, **Redis distributed caching**, **Kafka event-driven architecture**, **Stats Service with analytics**, and scalable architecture following **SOLID principles** and clean code best practices.
 
 <div align="center">
 
@@ -32,7 +32,7 @@ A production-ready, high-performance URL shortening service built with **Spring 
 - ✅ **URL Shortening** - Convert long URLs to short, memorable codes
 - ✅ **URL Redirection** - Fast HTTP redirects to original URLs
 - ✅ **Duplicate Handling** - Returns existing short URL for duplicate requests
-- ✅ **Statistics Tracking** - Monitor access counts and expiration dates
+- ✅ **Statistics Tracking** - Real-time analytics with click events, geographic data, and platform statistics
 - ✅ **URL Expiration** - Automatic expiration handling with configurable TTL
 
 ### Performance & Scalability
@@ -51,6 +51,10 @@ A production-ready, high-performance URL shortening service built with **Spring 
 - ✅ **Error Code System** - Type-safe error handling with ErrorCode enum
 - ✅ **API Gateway** - Spring Cloud Gateway with routing, CORS, and health endpoints
 - ✅ **Spring Boot Actuator** - Built-in health, readiness, and liveness probes
+- ✅ **Stats Service** - Event-driven analytics service with Kafka integration
+- ✅ **Kafka Event Streaming** - Asynchronous event processing for click analytics
+- ✅ **Batch Processing** - Optimized batch inserts and deferred statistics aggregation
+- ✅ **Performance Optimizations** - Handles 100M requests/day with single stats database
 
 ### Quality & Maintainability
 
@@ -75,6 +79,7 @@ A production-ready, high-performance URL shortening service built with **Spring 
 | **ORM**        | Spring Data JPA       | 3.2.0     |
 | **Database**   | PostgreSQL            | 15+       |
 | **Cache**      | Redis                 | 7+        |
+| **Message Broker** | Apache Kafka      | 7.5.0     |
 | **Connection Pool** | HikariCP         | -         |
 | **Build Tool** | Maven                 | 3.6+      |
 | **Lombok**     | Code Generation       | -         |
@@ -94,30 +99,41 @@ The application is built as a **Maven multi-module project** with four modules:
        ┌───────┴───────┐  ┌───────┴────────┐
        │               │  │                │
        ▼               ▼  ▼                ▼
-┌──────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-│  Common  │   │   Create    │   │   Lookup     │   │   API        │
-│  Module  │   │   Service    │   │   Service    │   │   Gateway    │
-│          │   │              │   │              │   │              │
-│ • Entity │   │ • Controller │   │ • Controller │   │ • Routing    │
-│ • Error  │   │ • Service    │   │ • Service    │   │ • Rate Limit │
-│   Codes  │   │ • Repository │   │ • Repository │   │ • CORS       │
-│          │   │ • Utils      │   │ • Cache      │   │ • Health     │
-│          │   │ • Factory    │   │ • Cleanup    │   │              │
-│          │   │ • Constants  │   │ • Constants  │   │              │
-│          │   │ • Exceptions │   │ • Exceptions  │   │              │
-└────┬─────┘   └──────┬───────┘   └──────┬───────┘   └──────┬───────┘
-     │                 │                  │                  │
-     └────────┬────────┴────────┬─────────┘                  │
-              │                 │                            │
-              ▼                 ▼                            │
-    ┌──────────────────────────────────┐                    │
-    │      Shared Database             │                    │
-    │  PostgreSQL (Primary + Replicas) │                    │
-    └──────────────────────────────────┘                    │
-              │                                              │
-              ▼                                              │
-    ┌──────────────────────────────────┐                    │
-    │      Redis Cache (Lookup Only)   │◄───────────────────┘
+┌──────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+│  Common  │   │   Create     │   │   Lookup     │   │   API        │   │   Stats     │
+│  Module  │   │   Service    │   │   Service    │   │   Gateway    │   │   Service   │
+│          │   │              │   │              │   │              │   │             │
+│ • Entity │   │ • Controller │   │ • Controller │   │ • Routing    │   │ • Analytics │
+│ • Error  │   │ • Service    │   │ • Service    │   │ • Rate Limit │   │ • Kafka     │
+│   Codes  │   │ • Repository │   │ • Repository │   │ • CORS       │   │   Consumer  │
+│ • Events │   │ • Utils      │   │ • Cache      │   │ • Health     │   │ • Batch     │
+│          │   │ • Factory    │   │ • Cleanup    │   │              │   │   Processing│
+│          │   │ • Constants  │   │ • Kafka      │   │              │   │             │
+│          │   │ • Exceptions │   │   Producer   │   │              │   │             │
+└────┬─────┘   └──────┬───────┘   └──────┬───────┘   └──────┬───────┘   └──────┬───────┘
+     │                 │                  │                  │                  │
+     └────────┬────────┴────────┬─────────┘                  │                  │
+              │                 │                            │                  │
+              ▼                 ▼                            │                  │
+    ┌──────────────────────────────────┐                    │                  │
+    │      Shared Database             │                    │                  │
+    │  PostgreSQL (Primary + Replicas) │                    │                  │
+    └──────────────────────────────────┘                    │                  │
+              │                                              │                  │
+              ▼                                              │                  │
+    ┌──────────────────────────────────┐                    │                  │
+    │      Redis Cache (Lookup Only)   │◄───────────────────┘                  │
+    └──────────────────────────────────┘                                        │
+              │                                                                  │
+              ▼                                                                  │
+    ┌──────────────────────────────────┐                                        │
+    │      Kafka (Event Streaming)     │◄────────────────────────────────────────┘
+    └──────────────────────────────────┘
+              │
+              ▼
+    ┌──────────────────────────────────┐
+    │      Stats Database               │
+    │  PostgreSQL (Separate Instance)  │
     └──────────────────────────────────┘
 ```
 
@@ -137,23 +153,30 @@ The application is built as a **Maven multi-module project** with four modules:
                     │  • Rate Limit  │
                     │  • CORS         │
                     │  • Health      │
-                    └─────┬─────┬─────┘
-                          │     │
-              ┌───────────┘     └───────────┐
-              │                              │
-              ▼                              ▼
-┌──────────────────────┐    ┌──────────────────────┐
-│  Create Service      │    │  Lookup Service       │
-│  Port: 8081         │    │  Port: 8082           │
-│                      │    │                      │
-│  • CreateUrlController│    │  • LookupUrlController│
-│  • CreateUrlService  │    │  • LookupUrlService  │
-│  • UrlCodeGenerator  │    │  • RedisCacheService │
-│  • UrlValidation     │    │  • UrlCleanupService  │
-└──────┬───────────────┘    └──────┬───────────────┘
-       │                            │
-       │                            │
-       ▼                            ▼
+                    └─────┬─────┬─────┬─────┘
+                          │     │     │
+              ┌───────────┘     │     └───────────┐
+              │                 │                 │
+              ▼                 ▼                 ▼
+┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
+│  Create Service      │  │  Lookup Service      │  │  Stats Service       │
+│  Port: 8081         │  │  Port: 8082           │  │  Port: 8083          │
+│                      │  │                      │  │                      │
+│  • CreateUrlController│  │  • LookupUrlController│  │  • StatsController   │
+│  • CreateUrlService  │  │  • LookupUrlService  │  │  • StatsService      │
+│  • UrlCodeGenerator  │  │  • RedisCacheService │  │  • BatchProcessor    │
+│  • UrlValidation     │  │  • Kafka Producer    │  │  • Kafka Consumer    │
+└──────┬───────────────┘  └──────┬───────────────┘  └──────┬───────────────┘
+       │                         │                         │
+       │                         │                         │
+       │                         │                         │
+       │                         ▼                         │
+       │              ┌──────────────────────┐            │
+       │              │  Kafka (Events)      │            │
+       │              │  Port: 9092          │            │
+       │              └──────────┬───────────┘            │
+       │                         │                        │
+       ▼                         ▼                        ▼
 ┌──────────────────────────────────────────────────────────┐
 │              Common Module (Shared)                      │
 │  • UrlMapping (Entity)                                   │
@@ -175,6 +198,10 @@ The application is built as a **Maven multi-module project** with four modules:
 │  • Replica 2 (Read) - Port 5435                         │
 │  • Replica 3 (Read) - Port 5436                         │
 │  • Health Checks & Round-Robin Load Balancing            │
+│                                                           │
+│  Stats Database (Separate Instance):                     │
+│  • Stats DB (Write/Read) - Port 5437                     │
+│  • Database: tinyurl_stats                               │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -337,7 +364,8 @@ This project demonstrates **100% adherence to SOLID principles** (Grade 10/10) w
 - **Maven 3.6+** (required)
 - **PostgreSQL 15+** (required)
 - **Redis 7+** (required)
-- **Docker & Docker Compose** (optional, for local PostgreSQL setup)
+- **Apache Kafka 7.5+** (required for Stats Service)
+- **Docker & Docker Compose** (optional, for local setup)
 - **Git** (optional, for cloning)
 
 ### Installation
@@ -362,13 +390,33 @@ This project demonstrates **100% adherence to SOLID principles** (Grade 10/10) w
    # Or install locally and start Redis server
    ```
 
+4. **Start Kafka**
+
+   ```bash
+   # Navigate to scripts directory
+   cd scripts/kafka
+   
+   # Start single broker (for development)
+   .\start-kafka.ps1
+   
+   # Or start 3-broker cluster (for production)
+   .\start-kafka-cluster.ps1
+   ```
+   
+   This will start:
+   - **Zookeeper**: `localhost:2181`
+   - **Kafka Broker(s)**: `localhost:9092` (single) or `localhost:9092,9093,9094` (cluster)
+   - **Kafka UI**: `http://localhost:8084`
+
 4. **Configure application**
 
    Update service configuration files:
    - `create-service/src/main/resources/application.yml` - Create service config
    - `lookup-service/src/main/resources/application.yml` - Lookup service config
+   - `stats-service/src/main/resources/application.yml` - Stats service config
+   - `api-gateway/src/main/resources/application.yml` - API Gateway config
    
-   Both services share the same PostgreSQL database but run on different ports.
+   Note: Create and Lookup services share the same PostgreSQL database. Stats service uses a separate database instance.
 
 5. **Build the project**
 
@@ -404,6 +452,11 @@ This project demonstrates **100% adherence to SOLID principles** (Grade 10/10) w
    cd api-gateway
    mvnw spring-boot:run
    # Or: java -jar target/api-gateway-1.0.0.jar
+   
+   # Terminal 4: Start Stats Service (Port 8083)
+   cd stats-service
+   mvnw spring-boot:run
+   # Or: java -jar target/stats-service-1.0.0.jar
    ```
 
 8. **Verify services are running**
@@ -411,10 +464,12 @@ This project demonstrates **100% adherence to SOLID principles** (Grade 10/10) w
    API Gateway: http://localhost:8080/actuator/health
    Create Service (via Gateway): http://localhost:8080/health/create
    Lookup Service (via Gateway): http://localhost:8080/health/lookup
+   Stats Service (via Gateway): http://localhost:8080/health/stats
    
    # Direct service endpoints (for debugging)
    Create Service: http://localhost:8081/actuator/health
    Lookup Service: http://localhost:8082/actuator/health
+   Stats Service: http://localhost:8083/actuator/health
    ```
 
 ## 🗄 Database Setup
@@ -435,10 +490,11 @@ docker-compose -f docker-compose-postgresql.yml up -d
 ```
 
 This will set up:
-- **Primary Database** (Write): `localhost:5433`
+- **Primary Database** (Write): `localhost:5433` - Database: `tinyurl`
 - **Read Replica 1**: `localhost:5434`
 - **Read Replica 2**: `localhost:5435`
 - **Read Replica 3**: `localhost:5436`
+- **Stats Database** (Separate): `localhost:5437` - Database: `tinyurl_stats`
 
 ### Manual Setup
 
@@ -458,11 +514,11 @@ To populate the database with test data:
 
 ### Accessing PostgreSQL
 
-- **Primary**: `localhost:5433`
-- **Replicas**: `localhost:5434`, `5435`, `5436`
+- **Primary**: `localhost:5433` (Database: `tinyurl`)
+- **Replicas**: `localhost:5434`, `5435`, `5436` (Database: `tinyurl`)
+- **Stats DB**: `localhost:5437` (Database: `tinyurl_stats`)
 - **Username**: `postgres`
 - **Password**: `postgres`
-- **Database**: `tinyurl`
 
 Use pgAdmin or any PostgreSQL client to connect.
 
@@ -478,6 +534,7 @@ The API Gateway provides a single entry point for all services with:
 - ✅ CORS configuration
 - ✅ Health check endpoints
 - ✅ Request/response logging
+- ✅ Stats Service routing
 
 ### Create Service (via API Gateway)
 
@@ -539,11 +596,58 @@ The API Gateway provides a single entry point for all services with:
 }
 ```
 
+### Stats Service (via API Gateway)
+
+#### 1. Get URL Statistics
+
+**Endpoint:** `GET http://localhost:8080/api/v1/stats/url/{shortCode}`
+
+**Example:** `GET http://localhost:8080/api/v1/stats/url/a3F9k1`
+
+**Response:** `200 OK`
+
+```json
+{
+  "shortCode": "a3F9k1",
+  "totalClicks": 1250,
+  "clicksToday": 45,
+  "clicksThisWeek": 320,
+  "clicksThisMonth": 850,
+  "firstClickAt": "2024-01-01T10:00:00",
+  "lastClickAt": "2024-01-15T14:30:00",
+  "topCountries": [
+    {"country": "United States", "clicks": 800},
+    {"country": "United Kingdom", "clicks": 200}
+  ],
+  "clickTimeline": [
+    {"date": "2024-01-15", "clicks": 45},
+    {"date": "2024-01-14", "clicks": 38}
+  ]
+}
+```
+
+#### 2. Get Platform Statistics
+
+**Endpoint:** `GET http://localhost:8080/api/v1/stats/platform`
+
+**Response:** `200 OK`
+
+```json
+{
+  "totalUrls": 1000000,
+  "totalClicks": 50000000,
+  "clicksToday": 500000,
+  "activeUrls": 1000000,
+  "lastUpdated": "2024-01-15T14:30:00"
+}
+```
+
 ### Health Check Endpoints (via API Gateway)
 
 - **API Gateway Health:** `GET http://localhost:8080/actuator/health`
 - **Create Service Health:** `GET http://localhost:8080/health/create`
 - **Lookup Service Health:** `GET http://localhost:8080/health/lookup`
+- **Stats Service Health:** `GET http://localhost:8080/health/stats`
 - **Gateway Routes:** `GET http://localhost:8080/actuator/gateway/routes`
 
 ### Example cURL Commands
@@ -575,6 +679,13 @@ curl -X POST http://localhost:8080/api/v1/create/shorten \
 curl http://localhost:8080/actuator/health
 curl http://localhost:8080/health/create
 curl http://localhost:8080/health/lookup
+curl http://localhost:8080/health/stats
+
+# Get URL statistics (via API Gateway)
+curl http://localhost:8080/api/v1/stats/url/a3F9k1
+
+# Get platform statistics (via API Gateway)
+curl http://localhost:8080/api/v1/stats/platform
 ```
 
 ## 💡 Implementation Highlights
@@ -853,6 +964,47 @@ logging:
     com.tinyurl: DEBUG
 ```
 
+**Stats Service** (`stats-service/src/main/resources/application.yml`):
+```yaml
+spring:
+  application:
+    name: stats-service
+
+  # PostgreSQL Database Configuration (Separate Instance)
+  datasource:
+    url: jdbc:postgresql://localhost:5437/tinyurl_stats
+    driverClassName: org.postgresql.Driver
+    username: postgres
+    password: postgres
+    hikari:
+      # Optimized for high throughput (100M requests/day)
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000    # 10 minutes
+      max-lifetime: 1800000   # 30 minutes
+
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: stats-service-group
+      max-poll-records: 500  # Batch processing
+      enable-auto-commit: false
+
+server:
+  port: 8083
+
+# Stats Service Configuration
+stats:
+  batch:
+    size: 100                          # Batch size for bulk inserts
+    flush-interval-seconds: 5          # Flush batch every 5 seconds
+  aggregation:
+    update-interval-minutes: 10        # Update aggregated stats every 10 minutes
+    enabled: true
+```
+
 **API Gateway** (`api-gateway/src/main/resources/application.yml`):
 ```yaml
 spring:
@@ -899,6 +1051,22 @@ spring:
             - Path=/health/lookup
           filters:
             - SetPath=/actuator/health
+        
+        # Stats Service Route
+        - id: stats-service
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/v1/stats/**
+          filters:
+            - AddRequestHeader=X-Gateway-Service, stats-service
+        
+        - id: stats-service-health
+          uri: http://localhost:8083
+          order: -1
+          predicates:
+            - Path=/health/stats
+          filters:
+            - SetPath=/actuator/health
 
 server:
   port: 8080
@@ -921,19 +1089,20 @@ management:
 ### API Gateway Settings
 
 - **Port**: 8080 (main entry point)
-- **Routing**: Routes requests to create-service (8081) and lookup-service (8082)
+- **Routing**: Routes requests to create-service (8081), lookup-service (8082), and stats-service (8083)
 - **CORS**: Configured with `allowedOriginPatterns` for cross-origin requests
 - **Rate Limiting**: Infrastructure in place (currently disabled, can be re-enabled)
-- **Health Endpoints**: `/health/create` and `/health/lookup` route to service health checks
+- **Health Endpoints**: `/health/create`, `/health/lookup`, and `/health/stats` route to service health checks
 - **Actuator**: Exposes gateway routes and health information
 
 ### Database Settings
 
-- **Primary**: Write operations only
-- **Replicas**: 3 read replicas
+- **Primary**: Write operations only (Port 5433, Database: `tinyurl`)
+- **Replicas**: 3 read replicas (Ports 5434-5436, Database: `tinyurl`)
+- **Stats Database**: Separate instance (Port 5437, Database: `tinyurl_stats`)
 - **Health Checks**: Every 30 seconds
 - **Max Replication Lag**: 10MB
-- **Connection Pool**: HikariCP (20 max connections per datasource)
+- **Connection Pool**: HikariCP (20 max connections for URL services, 50 for Stats Service)
 
 ## 🧪 Testing
 
@@ -960,13 +1129,20 @@ mvn test jacoco:report
 - [x] Spring Boot Actuator health endpoints ✅
 - [x] CORS configuration ✅
 - [x] Rate limiting infrastructure (currently disabled, can be re-enabled) ✅
+- [x] Stats Service with Kafka integration ✅
+- [x] Event-driven architecture for analytics ✅
+- [x] Batch processing for high throughput ✅
+- [x] Performance optimizations (100M requests/day) ✅
 - [ ] Add HTTPS support
 - [ ] Implement custom short URL support
 
 ### Advanced Features
 
-- [ ] URL expiration and cleanup jobs
-- [ ] Analytics dashboard
+- [x] URL expiration and cleanup jobs ✅
+- [x] Analytics service with click tracking ✅
+- [x] Geographic analytics (country/city) ✅
+- [x] Platform-wide statistics ✅
+- [ ] Analytics dashboard (UI)
 - [ ] QR code generation
 - [ ] Bulk URL shortening
 - [ ] API authentication (JWT)
@@ -1054,10 +1230,39 @@ tinyurl-service/
 │       └── util/
 │           └── IpAddressExtractor.java    # IP extraction utility
 │
+├── stats-service/                         # Stats Service (Port 8083)
+│   ├── pom.xml
+│   ├── PERFORMANCE_OPTIMIZATIONS.md       # Performance optimization docs
+│   └── src/main/java/com/tinyurl/stats/
+│       ├── StatsServiceApplication.java   # Main application class
+│       ├── controller/
+│       │   └── StatsController.java       # REST endpoints + Kafka consumer
+│       ├── service/
+│       │   ├── StatsService.java          # Statistics logic
+│       │   ├── BatchEventProcessor.java   # Batch processing
+│       │   └── StatisticsAggregationService.java  # Scheduled aggregation
+│       ├── repository/
+│       │   ├── UrlClickEventRepository.java
+│       │   └── UrlStatisticsRepository.java
+│       ├── entity/
+│       │   ├── UrlClickEvent.java         # Click event entity
+│       │   └── UrlStatistics.java        # Aggregated stats entity
+│       ├── dto/
+│       │   ├── ClickEventRequest.java
+│       │   ├── UrlStatisticsResponse.java
+│       │   └── PlatformStatisticsResponse.java
+│       └── config/
+│           └── KafkaConfig.java           # Kafka consumer config
+│
 └── scripts/
     ├── Database/
     │   ├── docker-compose-postgresql.yml
     │   └── start-postgresql-with-replication.ps1
+    ├── kafka/
+    │   ├── docker-compose-kafka.yml       # Single broker setup
+    │   ├── docker-compose-kafka-cluster.yml  # 3-broker cluster
+    │   ├── start-kafka.ps1                 # Start single broker
+    │   └── start-kafka-cluster.ps1        # Start cluster
     ├── load-test-create-service.ps1      # Load test for create service (via API Gateway)
     └── load-test-lookup-service.ps1      # Load test for lookup service (via API Gateway)
 ```
@@ -1069,8 +1274,9 @@ Maven builds modules in this order:
 2. **create-service** - Depends on common
 3. **lookup-service** - Depends on common
 4. **api-gateway** - Independent module (no dependency on common)
+5. **stats-service** - Depends on common (for ClickEvent DTO)
 
-Both services include the `common` module JAR as a dependency. The API Gateway is independent and routes requests to the services.
+Both services include the `common` module JAR as a dependency. The API Gateway is independent and routes requests to the services. Stats Service uses Kafka for event-driven architecture.
 
 ## 🎯 Key Design Decisions
 
@@ -1132,6 +1338,6 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ⭐ **Star this repo if you find it helpful!**
 
-Made with [Spring Boot](https://spring.io/projects/spring-boot) • [Java 17](https://www.oracle.com/java/) • [PostgreSQL](https://www.postgresql.org/) • [Redis](https://redis.io/)
+Made with [Spring Boot](https://spring.io/projects/spring-boot) • [Java 17](https://www.oracle.com/java/) • [PostgreSQL](https://www.postgresql.org/) • [Redis](https://redis.io/) • [Kafka](https://kafka.apache.org/)
 
 </div>

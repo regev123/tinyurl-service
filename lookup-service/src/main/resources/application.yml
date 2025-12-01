@@ -41,6 +41,7 @@ spring:
   # Redis Configuration
   data:
     redis:
+      database: 0
       host: localhost
       port: 6379
       username: default
@@ -54,6 +55,13 @@ spring:
           min-idle: 0
           max-wait: 10000ms
         shutdown-timeout: 200ms
+
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
 # Server Configuration
 server:
@@ -84,5 +92,9 @@ logging:
     com.tinyurl: DEBUG
     org.hibernate: WARN
     org.springframework.data.redis: DEBUG
-    io.lettuce.core: DEBUG
+
+# Kafka Topic Configuration
+kafka:
+  topic:
+    click-events: url-click-events
 

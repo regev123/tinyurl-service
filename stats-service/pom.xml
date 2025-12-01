@@ -11,9 +11,9 @@
         <version>1.0.0</version>
     </parent>
     
-    <artifactId>lookup-service</artifactId>
-    <name>Lookup Service</name>
-    <description>Microservice for URL lookup and redirect operations</description>
+    <artifactId>stats-service</artifactId>
+    <name>Stats Service</name>
+    <description>Microservice for URL analytics and statistics</description>
     
     <dependencies>
         <!-- Common module -->
@@ -41,25 +41,13 @@
             <scope>runtime</scope>
         </dependency>
         
-        <!-- Spring Boot Data Redis -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-redis</artifactId>
-        </dependency>
-        
-        <!-- Lettuce Connection Pool (for Redis) -->
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-pool2</artifactId>
-        </dependency>
-        
         <!-- Spring Boot Actuator -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
         
-        <!-- Spring Kafka (Producer) -->
+        <!-- Spring Kafka (Consumer) -->
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>

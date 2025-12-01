@@ -27,6 +27,7 @@
         <module>create-service</module>
         <module>lookup-service</module>
         <module>api-gateway</module>
+        <module>stats-service</module>
     </modules>
     
     <!-- Dependency Management -->

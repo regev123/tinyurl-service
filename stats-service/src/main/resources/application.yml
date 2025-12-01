@@ -1,0 +1,92 @@
+spring:
+  application:
+    name: stats-service
+
+  # PostgreSQL Database Configuration
+  # Stats service uses a separate PostgreSQL instance (port 5437) for complete isolation
+  # This allows independent scaling and prevents analytics queries from affecting URL operations
+  # Alternative: Use same instance (port 5433) with different database name (tinyurl_stats)
+  datasource:
+    url: jdbc:postgresql://localhost:5437/tinyurl_stats
+    driverClassName: org.postgresql.Driver
+    username: postgres
+    password: postgres
+    hikari:
+      # Optimized for high throughput (100M requests/day)
+      maximum-pool-size: 50  # Increased from 20 for batch processing
+      minimum-idle: 10       # Increased from 5
+      connection-timeout: 30000
+      idle-timeout: 600000    # 10 minutes
+      max-lifetime: 1800000   # 30 minutes
+      pool-name: StatsServiceHikariPool
+      # Performance tuning
+      leak-detection-threshold: 60000
+      register-mbeans: true
+
+  # JPA Configuration
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        # Batch processing for high throughput
+        jdbc:
+          batch_size: 100              # Batch inserts (100 events at once)
+          order_inserts: true           # Optimize batch inserts
+          order_updates: true          # Optimize batch updates
+        # Performance optimizations
+        generate_statistics: false     # Disable for production
+        use_sql_comments: false
+
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: stats-service-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      # Batch processing for high throughput
+      max-poll-records: 500            # Process up to 500 events per poll
+      fetch-min-size: 1024             # Minimum bytes to fetch
+      fetch-max-wait: 500              # Max wait time (ms) for fetch
+      # Performance tuning (custom properties)
+      properties:
+        session.timeout.ms: 30000
+        heartbeat.interval.ms: 10000
+
+server:
+  port: 8083
+
+# Kafka Topic Configuration
+kafka:
+  topic:
+    click-events: url-click-events
+
+# Stats Service Configuration
+stats:
+  batch:
+    size: 100                          # Batch size for bulk inserts
+    flush-interval-seconds: 5          # Flush batch every 5 seconds
+  aggregation:
+    update-interval-minutes: 10        # Update aggregated stats every 10 minutes
+    enabled: true                      # Enable scheduled aggregation
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.tinyurl.stats: DEBUG
+    org.springframework.web: INFO
+

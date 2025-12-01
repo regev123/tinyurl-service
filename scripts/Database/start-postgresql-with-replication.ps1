@@ -14,10 +14,10 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 docker-compose -f "$scriptDir\docker-compose-postgresql.yml" down -v 2>$null | Out-Null
 
 # Remove any orphaned containers with the same names
-docker rm -f tinyurl-postgres-primary tinyurl-postgres-replica1 tinyurl-postgres-replica2 tinyurl-postgres-replica3 2>$null | Out-Null
+docker rm -f tinyurl-postgres-primary tinyurl-postgres-replica1 tinyurl-postgres-replica2 tinyurl-postgres-replica3 tinyurl-postgres-stats 2>$null | Out-Null
 
 # Remove volumes if they still exist (in case docker-compose down -v didn't work)
-docker volume rm postgres-primary-data postgres-replica1-data postgres-replica2-data postgres-replica3-data 2>$null | Out-Null
+docker volume rm postgres-primary-data postgres-replica1-data postgres-replica2-data postgres-replica3-data postgres-stats-data 2>$null | Out-Null
 
 Write-Host "  Cleanup complete! All previous data has been removed.`n" -ForegroundColor Green
 
@@ -162,12 +162,21 @@ if ($replicaCount -match "\d+") {
     Write-Host "0" -ForegroundColor Yellow
 }
 
+# Check stats database health
+Write-Host "  Stats DB (port 5437): " -NoNewline
+$statsHealth = docker inspect --format='{{.State.Health.Status}}' tinyurl-postgres-stats 2>$null
+if ($statsHealth -eq "healthy") {
+    Write-Host "[OK] (healthy)" -ForegroundColor Green
+} else {
+    Write-Host "[CHECKING...]" -ForegroundColor Yellow
+}
+
 # Final summary
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "Setup Complete!" -ForegroundColor Green
 Write-Host "========================================`n" -ForegroundColor Cyan
 
-Write-Host "Connection Details:" -ForegroundColor Yellow
+Write-Host "URL Database Connection Details:" -ForegroundColor Yellow
 Write-Host "  Primary (Write):   localhost:5433" -ForegroundColor Cyan
 Write-Host "  Replica 1 (Read):  localhost:5434" -ForegroundColor Cyan
 Write-Host "  Replica 2 (Read):  localhost:5435" -ForegroundColor Cyan
@@ -175,6 +184,12 @@ Write-Host "  Replica 3 (Read):  localhost:5436" -ForegroundColor Cyan
 Write-Host "  Username:          postgres" -ForegroundColor Cyan
 Write-Host "  Password:          postgres" -ForegroundColor Cyan
 Write-Host "  Database:          tinyurl" -ForegroundColor Cyan
+
+Write-Host "`nStats Database Connection Details:" -ForegroundColor Yellow
+Write-Host "  Stats DB:          localhost:5437" -ForegroundColor Cyan
+Write-Host "  Username:          postgres" -ForegroundColor Cyan
+Write-Host "  Password:          postgres" -ForegroundColor Cyan
+Write-Host "  Database:          tinyurl_stats" -ForegroundColor Cyan
 
 Write-Host "`n[SUCCESS] All databases are synced and ready!" -ForegroundColor Green
 Write-Host "[INFO] When Hibernate creates tables on primary, they will automatically appear on all replicas.`n" -ForegroundColor Green
