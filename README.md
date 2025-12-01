@@ -34,6 +34,7 @@ A production-ready, high-performance URL shortening service built with **Spring 
 - ✅ **Duplicate Handling** - Returns existing short URL for duplicate requests
 - ✅ **Statistics Tracking** - Real-time analytics with click events, geographic data, and platform statistics
 - ✅ **URL Expiration** - Automatic expiration handling with configurable TTL
+- ✅ **QR Code Generation** - Generate QR codes for short URLs
 
 ### Performance & Scalability
 
@@ -634,6 +635,27 @@ The API Gateway provides a single entry point for all services with:
 }
 ```
 
+#### 2. Generate QR Code
+
+**Endpoint:** `GET http://localhost:8080/api/v1/create/qr?shortUrl={shortUrl}`
+
+**Parameters:**
+- `shortUrl` (required) - The short URL to encode in the QR code
+
+**Response:** `200 OK` - PNG image (Content-Type: image/png)
+
+**Example:**
+```
+GET http://localhost:8080/api/v1/create/qr?shortUrl=http://localhost:8080/abc123
+```
+
+Returns a PNG image of the QR code (300x300 pixels) that can be scanned to open the short URL.
+
+**Features:**
+- High error correction level (H) for better scanning reliability
+- UTF-8 encoding support
+- Cached for 1 hour for performance
+
 ### Lookup Service (via API Gateway)
 
 #### 2. Redirect to Original URL
@@ -1197,6 +1219,7 @@ mvn test jacoco:report
 - [x] React frontend with Tailwind CSS ✅
 - [x] Analytics dashboard UI ✅
 - [x] INFO level logging across all services ✅
+- [x] QR code generation ✅
 - [ ] Add HTTPS support
 - [ ] Implement custom short URL support
 
@@ -1207,7 +1230,7 @@ mvn test jacoco:report
 - [x] Geographic analytics (country/city) ✅
 - [x] Platform-wide statistics ✅
 - [x] Analytics dashboard (React UI) ✅
-- [ ] QR code generation
+- [x] QR code generation ✅
 - [ ] Bulk URL shortening
 - [ ] API authentication (JWT)
 - [ ] Database sharding (if needed for further scaling)
@@ -1243,11 +1266,12 @@ tinyurl-service/
 │   └── src/main/java/com/tinyurl/create/
 │       ├── CreateServiceApplication.java  # Main application class
 │       ├── controller/
-│       │   └── CreateUrlController.java   # REST endpoints
+│       │   └── CreateUrlController.java   # REST endpoints (URL creation + QR code generation)
 │       ├── service/
 │       │   ├── CreateUrlService.java      # URL creation logic
 │       │   ├── UrlCodeGenerator.java      # Code generation
 │       │   ├── UrlValidationService.java  # Input validation
+│       │   ├── QrCodeService.java         # QR code generation
 │       │   ├── RequestContextExtractor.java
 │       │   └── UrlCreationService.java   # Service interface
 │       ├── repository/

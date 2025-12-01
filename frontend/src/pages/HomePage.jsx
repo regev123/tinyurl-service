@@ -3,6 +3,9 @@ import { useState } from 'react'
 function HomePage() {
   const [longUrl, setLongUrl] = useState('')
   const [shortUrl, setShortUrl] = useState('')
+  const [qrCodeUrl, setQrCodeUrl] = useState('')
+  const [qrCodeError, setQrCodeError] = useState('')
+  const [qrCodeLoading, setQrCodeLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -31,6 +34,38 @@ function HomePage() {
 
       const data = await response.json()
       setShortUrl(data.shortUrl)
+      setQrCodeError('')
+      setQrCodeLoading(true)
+      // Generate QR code URL
+      if (data.shortUrl) {
+        const qrCodeEndpoint = `http://localhost:8080/api/v1/create/qr?shortUrl=${encodeURIComponent(data.shortUrl)}`
+        setQrCodeUrl(qrCodeEndpoint)
+        console.log('QR Code URL:', qrCodeEndpoint)
+        
+        // Test if QR code endpoint is accessible
+        fetch(qrCodeEndpoint)
+          .then(res => {
+            if (!res.ok) {
+              throw new Error(`QR code endpoint returned ${res.status}`)
+            }
+            return res.blob()
+          })
+          .then(blob => {
+            if (blob.type.startsWith('image/')) {
+              console.log('QR code endpoint is working')
+              setQrCodeError('')
+            } else {
+              throw new Error('Response is not an image')
+            }
+          })
+          .catch(err => {
+            console.error('QR code endpoint error:', err)
+            setQrCodeError(`QR code unavailable: ${err.message}`)
+          })
+          .finally(() => {
+            setQrCodeLoading(false)
+          })
+      }
       setLongUrl('')
     } catch (err) {
       setError(err.message || 'An error occurred. Please try again.')
@@ -105,8 +140,8 @@ function HomePage() {
           {/* Short URL Result */}
           {shortUrl && (
             <div className="mt-6 p-6 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm font-medium text-gray-700 mb-2">Your short URL:</p>
-              <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-gray-700 mb-4">Your short URL:</p>
+              <div className="flex items-center gap-2 mb-4">
                 <input
                   type="text"
                   value={shortUrl}
@@ -120,6 +155,51 @@ function HomePage() {
                   Copy
                 </button>
               </div>
+              
+              {/* QR Code */}
+              {qrCodeUrl && (
+                <div className="mt-4 pt-4 border-t border-green-200">
+                  <p className="text-sm font-medium text-gray-700 mb-3 text-center">QR Code:</p>
+                  <div className="flex justify-center">
+                    <div className="bg-white p-4 rounded-lg shadow-sm">
+                      {qrCodeLoading && (
+                        <div className="w-48 h-48 flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                        </div>
+                      )}
+                      {!qrCodeLoading && !qrCodeError && (
+                        <img 
+                          src={qrCodeUrl} 
+                          alt="QR Code" 
+                          className="w-48 h-48"
+                          onError={(e) => {
+                            console.error('QR Code image failed to load:', qrCodeUrl)
+                            setQrCodeError('Failed to load QR code image. Please ensure the create-service is running and has been rebuilt with QR code dependencies.')
+                          }}
+                          onLoad={() => {
+                            console.log('QR Code image loaded successfully')
+                            setQrCodeError('')
+                          }}
+                        />
+                      )}
+                      {qrCodeError && (
+                        <div className="w-48 h-48 flex items-center justify-center">
+                          <div className="text-red-500 text-xs text-center p-4">
+                            {qrCodeError}
+                            <br />
+                            <span className="text-gray-400 text-xs mt-2 block">
+                              Make sure create-service is running and rebuilt
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {!qrCodeError && !qrCodeLoading && (
+                    <p className="text-xs text-gray-500 text-center mt-2">Scan to open the short URL</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
