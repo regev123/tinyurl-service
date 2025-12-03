@@ -1,6 +1,6 @@
 # Shortify Service
 
-A production-ready, enterprise-grade URL shortening service built with **Spring Boot microservices**. Features **PostgreSQL with read replicas** for horizontal read scaling, **Redis cluster** (3 masters + 3 replicas) or standalone Redis for high-availability distributed caching, **Kafka** event streaming for real-time analytics, **RedisInsight GUI** for Redis management, and a modern **React + Tailwind CSS** frontend. Designed with **SOLID principles** and clean architecture for scalability, maintainability, and performance.
+A production-ready, enterprise-grade URL shortening service built with **Spring Boot microservices**. Features **PostgreSQL with read replicas** (1 primary + 3 replicas) for horizontal read scaling, **Redis cluster** (3 masters + 3 replicas) for high-availability distributed caching, **Kafka cluster** (3 brokers) for event streaming and real-time analytics, and a modern **React + Tailwind CSS** frontend. Designed with **SOLID principles** and clean architecture for scalability, maintainability, and performance.
 
 > **Note:** This project is inspired by [TinyURL](https://tinyurl.com/), the popular URL shortening service.
 
@@ -45,7 +45,7 @@ A production-ready, enterprise-grade URL shortening service built with **Spring 
 - ✅ **Read/Write Splitting** - Automatic routing of reads to replicas and writes to primary
 - ✅ **Replica Health Checks** - Automatic monitoring and failover for unhealthy replicas
 - ✅ **Round-Robin Load Balancing** - Even distribution of read requests across replicas
-- ✅ **Redis Distributed Cache** - High-performance caching with adaptive TTL (10-30 minutes)
+- ✅ **Redis Distributed Cache** - High-performance caching with adaptive TTL (10-30 minutes), supports **standalone** or **cluster** (3 masters + 3 replicas) modes
 - ✅ **Cache Abstraction** - CacheService interface for easy implementation swapping
 - ✅ **Database Indexing** - Optimized lookups on short URLs
 - ✅ **Connection Pooling** - HikariCP with optimized pool settings
@@ -54,7 +54,8 @@ A production-ready, enterprise-grade URL shortening service built with **Spring 
 - ✅ **Error Code System** - Type-safe error handling with ErrorCode enum
 - ✅ **API Gateway** - Spring Cloud Gateway with routing, CORS, and health endpoints
 - ✅ **Spring Boot Actuator** - Built-in health, readiness, and liveness probes
-- ✅ **Stats Service** - Event-driven analytics service with Kafka integration
+- ✅ **Stats Service** - Event-driven analytics service with Kafka cluster integration
+- ✅ **Kafka Cluster** - 3-broker cluster for high-availability event streaming
 - ✅ **Kafka Event Streaming** - Asynchronous event processing for click analytics and URL deletion events
 - ✅ **Batch Processing** - Optimized batch inserts and deferred statistics aggregation
 - ✅ **Performance Optimizations** - Handles 100M requests/day with single stats database
