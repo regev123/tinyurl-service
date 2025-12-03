@@ -1,6 +1,6 @@
 # Shortify Service
 
-A production-ready, high-performance URL shortening service built with **Spring Boot**, featuring **PostgreSQL with read replicas**, **Redis distributed caching**, **Kafka event-driven architecture**, **Stats Service with analytics**, **React frontend with Tailwind CSS**, and scalable architecture following **SOLID principles** and clean code best practices.
+A production-ready, enterprise-grade URL shortening service built with **Spring Boot microservices**. Features **PostgreSQL with read replicas** for horizontal read scaling, **Redis cluster** (3 masters + 3 replicas) or standalone Redis for high-availability distributed caching, **Kafka** event streaming for real-time analytics, **RedisInsight GUI** for Redis management, and a modern **React + Tailwind CSS** frontend. Designed with **SOLID principles** and clean architecture for scalability, maintainability, and performance.
 
 > **Note:** This project is inspired by [TinyURL](https://tinyurl.com/), the popular URL shortening service.
 
@@ -373,7 +373,7 @@ This project demonstrates **100% adherence to SOLID principles** (Grade 10/10) w
 - **PostgreSQL 15+** (required)
 - **Redis 7+** (required)
 - **Apache Kafka 7.5+** (required for Stats Service)
-- **Docker & Docker Compose** (optional, for local setup)
+- **Docker Desktop** (required for PostgreSQL, Redis, and Kafka setup - Redis cluster uses `host.docker.internal` for Spring Boot connectivity)
 - **Git** (optional, for cloning)
 
 ### Installation
@@ -391,12 +391,27 @@ This project demonstrates **100% adherence to SOLID principles** (Grade 10/10) w
 
 3. **Start Redis**
 
-   ```bash
-   # Using Docker
-   docker run -d -p 6379:6379 redis:7-alpine
-
-   # Or install locally and start Redis server
+   You have two options: **Standalone** (for development) or **Cluster** (for production):
+   
+   **Option A: Standalone Redis (Development)**
+   ```powershell
+   cd scripts\redis
+   .\start-redis.ps1
    ```
+   - Single Redis instance on `localhost:7001`
+   - RedisInsight GUI: `http://localhost:8086`
+   
+   **Option B: Redis Cluster (Production)**
+   ```powershell
+   cd scripts\redis
+   .\start-redis-cluster.ps1
+   ```
+   - 6 nodes (3 masters + 3 replicas) on `host.docker.internal:7001-7006`
+   - RedisInsight GUI: `http://localhost:8086`
+   - High availability and automatic failover
+   - **Note**: Spring Boot connects via `host.docker.internal` (Docker Desktop's host gateway)
+   
+   See [Redis Setup Guide](scripts/redis/README.md) for detailed instructions and switching between modes.
 
 4. **Start Kafka**
 
@@ -1031,13 +1046,26 @@ spring:
   # Redis Configuration (Lookup Service Only)
   data:
     redis:
-      host: localhost
-      port: 6379
-      timeout: 10000ms
+      # Standalone mode (for development)
+      # host: localhost
+      # port: 7001
+      # database: 0
+      
+      # Cluster mode (for production) - 3 masters + 3 replicas
+      cluster:
+        nodes: host.docker.internal:7001,host.docker.internal:7002,host.docker.internal:7003,host.docker.internal:7004,host.docker.internal:7005,host.docker.internal:7006
+        max-redirects: 3
+        refresh:
+          adaptive: true
+          period: 30s
       lettuce:
         pool:
           max-active: 8
           max-idle: 8
+        cluster:
+          refresh:
+            adaptive: true
+            period: 30s
 
 server:
   port: 8082

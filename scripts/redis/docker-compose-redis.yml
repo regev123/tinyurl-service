@@ -1,0 +1,37 @@
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: shortify-redis
+    command: >
+      redis-server
+      --appendonly yes
+      --port 6379
+      --bind 0.0.0.0
+      --protected-mode no
+    ports:
+      - "7001:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: shortify-redisinsight
+    depends_on:
+      - redis
+    ports:
+      - "8086:5540"
+    volumes:
+      - redisinsight-data:/data
+    environment:
+      - RITRUSTEDORIGINS=http://localhost:8086
+      - RITRUSTEDORIGINS=https://localhost:8086
+
+volumes:
+  redis-data:
+  redisinsight-data:
+

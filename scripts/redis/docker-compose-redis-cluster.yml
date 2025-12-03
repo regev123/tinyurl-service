@@ -1,0 +1,190 @@
+services:
+  # Redis Cluster Node 1 (Master)
+  redis-node-1:
+    image: redis:7.2-alpine
+    container_name: shortify-redis-node-1
+    command: >
+      redis-server
+      --cluster-enabled yes
+      --cluster-config-file /data/nodes.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --port 6379
+      --bind 0.0.0.0
+      --protected-mode no
+    ports:
+      - "7001:6379"
+      - "17001:16379"
+    volumes:
+      - redis-node-1-data:/data
+    networks:
+      - redis-cluster-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Redis Cluster Node 2 (Master)
+  redis-node-2:
+    image: redis:7.2-alpine
+    container_name: shortify-redis-node-2
+    command: >
+      redis-server
+      --cluster-enabled yes
+      --cluster-config-file /data/nodes.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --port 6379
+      --bind 0.0.0.0
+      --protected-mode no
+    ports:
+      - "7002:6379"
+      - "17002:16379"
+    volumes:
+      - redis-node-2-data:/data
+    networks:
+      - redis-cluster-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Redis Cluster Node 3 (Master)
+  redis-node-3:
+    image: redis:7.2-alpine
+    container_name: shortify-redis-node-3
+    command: >
+      redis-server
+      --cluster-enabled yes
+      --cluster-config-file /data/nodes.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --port 6379
+      --bind 0.0.0.0
+      --protected-mode no
+    ports:
+      - "7003:6379"
+      - "17003:16379"
+    volumes:
+      - redis-node-3-data:/data
+    networks:
+      - redis-cluster-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Redis Cluster Node 4 (Replica)
+  redis-node-4:
+    image: redis:7.2-alpine
+    container_name: shortify-redis-node-4
+    command: >
+      redis-server
+      --cluster-enabled yes
+      --cluster-config-file /data/nodes.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --port 6379
+      --bind 0.0.0.0
+      --protected-mode no
+    ports:
+      - "7004:6379"
+      - "17004:16379"
+    volumes:
+      - redis-node-4-data:/data
+    networks:
+      - redis-cluster-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Redis Cluster Node 5 (Replica)
+  redis-node-5:
+    image: redis:7.2-alpine
+    container_name: shortify-redis-node-5
+    command: >
+      redis-server
+      --cluster-enabled yes
+      --cluster-config-file /data/nodes.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --port 6379
+      --bind 0.0.0.0
+      --protected-mode no
+    ports:
+      - "7005:6379"
+      - "17005:16379"
+    volumes:
+      - redis-node-5-data:/data
+    networks:
+      - redis-cluster-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Redis Cluster Node 6 (Replica)
+  redis-node-6:
+    image: redis:7.2-alpine
+    container_name: shortify-redis-node-6
+    command: >
+      redis-server
+      --cluster-enabled yes
+      --cluster-config-file /data/nodes.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --port 6379
+      --bind 0.0.0.0
+      --protected-mode no
+    ports:
+      - "7006:6379"
+      - "17006:16379"
+    volumes:
+      - redis-node-6-data:/data
+    networks:
+      - redis-cluster-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # RedisInsight GUI for cluster management
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: shortify-redisinsight
+    depends_on:
+      - redis-node-1
+      - redis-node-2
+      - redis-node-3
+      - redis-node-4
+      - redis-node-5
+      - redis-node-6
+    ports:
+      - "8086:5540"
+    volumes:
+      - redisinsight-data:/data
+    networks:
+      - redis-cluster-network
+    environment:
+      - RITRUSTEDORIGINS=http://localhost:8086
+      - RITRUSTEDORIGINS=https://localhost:8086
+
+volumes:
+  redis-node-1-data:
+  redis-node-2-data:
+  redis-node-3-data:
+  redis-node-4-data:
+  redis-node-5-data:
+  redis-node-6-data:
+  redisinsight-data:
+
+networks:
+  redis-cluster-network:
+    driver: bridge

@@ -3,14 +3,19 @@ package com.shortify.lookup.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisClusterConfiguration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
+import java.util.Arrays;
+import java.util.List;
+
 /**
  * Configuration for Redis cache
+ * Supports both standalone and cluster modes
  * Follows Single Responsibility Principle - only handles cache configuration
  * Follows Dependency Inversion Principle - provides RedisTemplate abstraction
  */
@@ -33,14 +38,54 @@ public class CacheConfig {
     @Value("${spring.data.redis.password:}")
     private String redisPassword;
     
+    // Cluster configuration (optional)
+    @Value("${spring.data.redis.cluster.nodes:#{null}}")
+    private String clusterNodes;
+    
+    @Value("${spring.data.redis.cluster.max-redirects:3}")
+    private int maxRedirects;
+    
     /**
      * Creates Redis connection factory
-     * Handles optional username/password configuration
+     * Supports both standalone and cluster modes
+     * If cluster.nodes is configured, uses cluster mode; otherwise uses standalone
      * 
      * @return configured Redis connection factory
      */
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
+        // Check if cluster mode is enabled
+        if (isNotEmpty(clusterNodes)) {
+            return createClusterConnectionFactory();
+        } else {
+            return createStandaloneConnectionFactory();
+        }
+    }
+    
+    /**
+     * Creates Redis cluster connection factory
+     * 
+     * @return cluster connection factory
+     */
+    private RedisConnectionFactory createClusterConnectionFactory() {
+        List<String> nodes = Arrays.asList(clusterNodes.split(","));
+        RedisClusterConfiguration clusterConfig = new RedisClusterConfiguration(nodes);
+        clusterConfig.setMaxRedirects(maxRedirects);
+        
+        // Set password if provided
+        if (isNotEmpty(redisPassword)) {
+            clusterConfig.setPassword(redisPassword);
+        }
+        
+        return new LettuceConnectionFactory(clusterConfig);
+    }
+    
+    /**
+     * Creates Redis standalone connection factory
+     * 
+     * @return standalone connection factory
+     */
+    private RedisConnectionFactory createStandaloneConnectionFactory() {
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
         config.setHostName(redisHost);
         config.setPort(redisPort);

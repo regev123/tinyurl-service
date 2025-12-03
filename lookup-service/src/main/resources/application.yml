@@ -41,13 +41,31 @@ spring:
   # Redis Configuration
   data:
     redis:
-      database: 0
-      host: localhost
-      port: 6379
-      username: default
-      password:
-      timeout: 10000ms
-      connect-timeout: 10000ms
+      # ============================================
+      # OPTION 1: Standalone Mode (Single Redis)
+      # ============================================
+      # To use: Uncomment the standalone config below and comment out cluster config
+      # Start Redis: cd scripts/redis && .\start-redis.ps1
+      # Database 0: Used for URL lookup caching (keys: url:*, url:access:*)
+      # database: 0
+      # host: localhost
+      # port: 7001
+      # timeout: 10000ms
+      # connect-timeout: 10000ms
+      
+      # ============================================
+      # OPTION 2: Cluster Mode (Redis Cluster - 3 masters + 3 replicas)
+      # ============================================
+      # To use: Comment out standalone config above and uncomment cluster config below
+      # Start Cluster: cd scripts/redis && .\start-redis-cluster.ps1
+      # Note: Redis Cluster only supports Database 0 (keys: url:*, url:access:*)
+      cluster:
+        nodes: host.docker.internal:7001,host.docker.internal:7002,host.docker.internal:7003,host.docker.internal:7004,host.docker.internal:7005,host.docker.internal:7006
+        max-redirects: 3
+        refresh:
+          adaptive: true
+          period: 30s
+      
       lettuce:
         pool:
           max-active: 8
@@ -55,6 +73,11 @@ spring:
           min-idle: 0
           max-wait: 10000ms
         shutdown-timeout: 200ms
+        # Cluster refresh settings (only needed for cluster mode)
+        cluster:
+          refresh:
+            adaptive: true
+            period: 30s
 
   # Kafka Configuration
   kafka:
