@@ -132,7 +132,7 @@ public class DatabasePartitionInitializer {
             // Uniqueness is guaranteed by Snowflake ID generation, and we use index for fast lookups
             String createTableSql = """
                 CREATE TABLE url_mappings (
-                    id BIGSERIAL,
+                    id BIGSERIAL NOT NULL,
                     original_url VARCHAR(5000) NOT NULL,
                     short_url VARCHAR(10) NOT NULL,
                     created_at TIMESTAMP NOT NULL,
